@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bean Bench — Coffee Cost Calculator</title>
+  <meta name="version" content="1.3.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link id="themeFonts" href="" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ══════════════════════════════════════════════
+       THEME DEFINITIONS
+    ══════════════════════════════════════════════ */
+
+    /* Default / South America — deep Amazon greens, terracotta, aged parchment */
+    :root {
+      --bg:        #0f1a0e;
+      --surface:   #182415;
+      --border:    #2e5028;
+      --muted:     #7aaa6a;
+      --cream:     #f0ead0;
+      --cream-dim: #c8c09a;
+      --accent:    #d4a017;
+      --accent-dim:#7a5a08;
+      --input-bg:  #1f2e1c;
+      --green:     #3a8c4a;
+      --thead-bg:  #111f10;
+      --font-ui:   'Crimson Pro', Georgia, serif;
+      --font-mono: 'Fira Code', 'Courier New', monospace;
+      --font-head: 'Playfair Display', Georgia, serif;
+      --radius:    4px;
+    }
+
+    /* Africa — rich ochre earth, deep umber, saffron, warm ivory */
+    [data-theme="africa"] {
+      --bg:        #1a1005;
+      --surface:   #261808;
+      --border:    #6b3d10;
+      --muted:     #d4904a;
+      --cream:     #fdf0d0;
+      --cream-dim: #d8b878;
+      --accent:    #e8720c;
+      --accent-dim:#8a3c04;
+      --input-bg:  #301e0a;
+      --green:     #4a8c30;
+      --thead-bg:  #1e1206;
+      --font-ui:   'Ubuntu', sans-serif;
+      --font-mono: 'Ubuntu Mono', monospace;
+      --font-head: 'Philosopher', Georgia, serif;
+      --radius:    2px;
+    }
+
+    /* Central America — volcanic black, jade, marigold, limestone white */
+    [data-theme="central-america"] {
+      --bg:        #0a0f0a;
+      --surface:   #121812;
+      --border:    #1e4a2a;
+      --muted:     #5aaa78;
+      --cream:     #f4f8e8;
+      --cream-dim: #a8c898;
+      --accent:    #f0c040;
+      --accent-dim:#906800;
+      --input-bg:  #161e16;
+      --green:     #28884a;
+      --thead-bg:  #0c140c;
+      --font-ui:   'Raleway', sans-serif;
+      --font-mono: 'Space Mono', monospace;
+      --font-head: 'Josefin Sans', sans-serif;
+      --radius:    0px;
+    }
+
+    /* Southeast Asia — deep indigo-black, lotus pink, golden temple, rice paper */
+    [data-theme="sea"] {
+      --bg:        #0d0a14;
+      --surface:   #160f22;
+      --border:    #3a2860;
+      --muted:     #9a80c8;
+      --cream:     #f8f0ff;
+      --cream-dim: #c8aee8;
+      --accent:    #d4a0f0;
+      --accent-dim:#6a3898;
+      --input-bg:  #1e1530;
+      --green:     #3a9870;
+      --thead-bg:  #100c1a;
+      --font-ui:   'Noto Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-head: 'Cinzel', Georgia, serif;
+      --radius:    8px;
+    }
+
+    /* ══════════════════════════════════════════════
+       BASE STYLES
+    ══════════════════════════════════════════════ */
+    html, body { min-height: 100%; background: var(--bg); color: var(--cream);
+      font-family: var(--font-ui), sans-serif; font-weight: 400; }
+
+    body { display: flex; flex-direction: column; align-items: center;
+      padding: 1.5rem 1rem 7rem; }
+
+    /* ── Update banner ── */
+    .update-banner { display: none; width: 100%; max-width: 500px; margin-bottom: 1rem;
+      background: var(--accent-dim); border: 1px solid var(--accent); border-radius: var(--radius);
+      padding: 0.6rem 1rem; font-family: var(--font-mono); font-size: 0.72rem;
+      color: var(--cream); letter-spacing: 0.04em; text-align: center; }
+    .update-banner a { color: var(--accent); text-decoration: underline; }
+    .update-banner.visible { display: block; }
+
+    /* ── Theme footer ── */
+    .theme-footer { position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 0.6rem 1.25rem 0.7rem;
+      display: flex; flex-direction: column; align-items: center; gap: 0.35rem; }
+
+    .theme-footer-row { width: 100%; max-width: 500px;
+      display: flex; align-items: center; gap: 0.75rem; }
+
+    .theme-footer-label { font-family: var(--font-mono); font-size: 0.6rem;
+      letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted);
+      white-space: nowrap; flex: 0 0 auto; }
+
+    .theme-name-display { font-family: var(--font-mono); font-size: 0.6rem;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent);
+      white-space: nowrap; flex: 0 0 auto; min-width: 7rem; text-align: right; }
+
+    /* Range slider — cross-browser styled */
+    .theme-slider { flex: 1; -webkit-appearance: none; appearance: none;
+      height: 3px; border-radius: 2px; outline: none; cursor: pointer;
+      background: linear-gradient(to right, var(--accent) 0%, var(--accent) 0%, var(--border) 0%); }
+
+    .theme-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--accent); border: 2px solid var(--bg);
+      box-shadow: 0 0 0 1px var(--accent); cursor: pointer; transition: transform 0.15s; }
+    .theme-slider::-webkit-slider-thumb:active { transform: scale(1.2); }
+
+    .theme-slider::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%;
+      background: var(--accent); border: 2px solid var(--bg); cursor: pointer; }
+
+    .theme-pips { width: 100%; max-width: 500px; display: flex; justify-content: space-between;
+      padding: 0 9px; /* half thumb width to align pips under thumbstops */ }
+    .theme-pip { font-family: var(--font-mono); font-size: 0.55rem; letter-spacing: 0.04em;
+      text-transform: uppercase; color: var(--muted); white-space: nowrap; text-align: center;
+      cursor: pointer; transition: color 0.15s; }
+    .theme-pip:hover { color: var(--accent); }
+    .theme-pip.active { color: var(--accent); font-weight: 700; }
+
+    /* ── Header ── */
+    .header { text-align: center; margin-bottom: 1.5rem; }
+    .header-eyebrow { font-family: var(--font-mono); font-size: 0.65rem;
+      letter-spacing: 0.25em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.5rem; }
+    .header h1 { font-family: var(--font-head); font-weight: 700;
+      font-size: clamp(1.5rem, 5vw, 2.2rem); color: var(--cream); letter-spacing: 0.02em; }
+
+    /* ── Card ── */
+    .card { width: 100%; max-width: 500px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius); }
+
+    /* ── Result banner ── */
+    .result-banner { padding: 1.75rem 2rem 1.5rem; border-bottom: 1px solid var(--border);
+      text-align: center; }
+    .result-label { font-family: var(--font-mono); font-size: 0.65rem;
+      letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem; }
+    .result-value { font-family: var(--font-mono); font-weight: 700;
+      font-size: clamp(3rem, 10vw, 5rem); line-height: 1; color: var(--accent);
+      transition: color 0.2s; }
+    .result-value.empty { color: var(--accent-dim); }
+    .result-unit { font-family: var(--font-mono); font-size: 0.8rem;
+      letter-spacing: 0.15em; color: var(--muted); margin-top: 0.35rem; }
+
+    /* ── Form body ── */
+    .form-body { padding: 1.5rem 2rem; display: flex; flex-direction: column; gap: 1.1rem; }
+    .field-row { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; align-items: end; }
+    .field { display: flex; flex-direction: column; gap: 0.4rem; }
+    label { font-family: var(--font-mono); font-size: 0.65rem;
+      letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+
+    input[type="text"], input[type="number"], input[type="password"] {
+      width: 100%; background: var(--input-bg); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--cream); font-family: var(--font-mono);
+      font-size: 1rem; padding: 0.6rem 0.75rem; outline: none; transition: border-color 0.15s; }
+    input[type="number"] { -moz-appearance: textfield; }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+    input:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--accent-dim); opacity: 0.5; }
+
+    .meta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+
+    /* ── Unit toggle switch ── */
+    .unit-toggle { display: flex; flex-direction: column; gap: 0.4rem; }
+
+    .unit-switch { position: relative; display: flex; align-items: center;
+      background: var(--input-bg); border: 1px solid var(--border);
+      border-radius: 99px; padding: 3px; gap: 0; cursor: pointer;
+      user-select: none; -webkit-user-select: none; }
+
+    /* sliding pill */
+    .unit-switch-pill { position: absolute; top: 3px; bottom: 3px;
+      border-radius: 99px; background: var(--accent);
+      transition: left 0.2s cubic-bezier(.4,0,.2,1), width 0.2s cubic-bezier(.4,0,.2,1);
+      pointer-events: none; z-index: 0; }
+
+    .unit-switch-opt { position: relative; z-index: 1; flex: 1;
+      text-align: center; font-family: var(--font-mono); font-size: 0.72rem;
+      font-weight: 600; letter-spacing: 0.05em; padding: 0.45rem 0.3rem;
+      color: var(--muted); transition: color 0.15s; white-space: nowrap; cursor: pointer; }
+    .unit-switch-opt.active { color: var(--bg); }
+
+    /* ── Value badge ── */
+    .value-badge { display: inline-flex; align-items: center; gap: 0.35rem;
+      font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 0.3rem 0.75rem; border-radius: 99px;
+      border: 1.5px solid currentColor; margin-top: 0.6rem;
+      opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+    .value-badge.visible { opacity: 1; pointer-events: auto; }
+    .value-badge.cheap       { color: #5ab870; }
+    .value-badge.daily       { color: #6aaed6; }
+    .value-badge.splurge     { color: #e0a030; }
+    .value-badge.expensive   { color: #d05060; }
+    .value-badge.no-data     { color: var(--muted); border-style: dashed; font-weight: 400; }
+
+    /* ── Currency select ── */
+    .currency-row { display: flex; gap: 0.5rem; align-items: end; }
+    select { width: 100%; background: var(--input-bg); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--cream); font-family: var(--font-mono);
+      font-size: 0.85rem; padding: 0.6rem 0.75rem; outline: none; cursor: pointer;
+      -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 0.75rem center; padding-right: 2rem; }
+    select:focus { border-color: var(--accent); outline: none; }
+
+    /* ── Save button ── */
+    .save-btn { width: 100%; background: var(--accent); border: none; border-radius: var(--radius);
+      color: var(--bg); font-family: var(--font-mono); font-weight: 700;
+      font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase;
+      padding: 0.75rem 1rem; cursor: pointer; transition: opacity 0.15s, transform 0.1s; margin-top: 0.3rem; }
+    .save-btn:hover { opacity: 0.88; }
+    .save-btn:active { transform: scale(0.98); }
+    .save-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ── Toast ── */
+    .toast { position: fixed; bottom: 1.5rem; left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: var(--green); color: #fff; font-family: var(--font-mono);
+      font-size: 0.75rem; letter-spacing: 0.08em; padding: 0.55rem 1.2rem;
+      border-radius: var(--radius); opacity: 0; pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s; z-index: 100; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Divider ── */
+    .divider { height: 1px; background: var(--border); }
+
+    /* ── Conversion note ── */
+    .conversion-note { font-family: var(--font-mono); font-size: 0.68rem;
+      color: var(--muted); text-align: center; padding: 0.75rem 2rem;
+      letter-spacing: 0.04em; min-height: 2.2rem; }
+
+    /* ── GitHub config panel ── */
+    .github-panel { width: 100%; max-width: 500px; margin-top: 1.25rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden; }
+    .github-panel-header { display: flex; align-items: center; justify-content: space-between;
+      padding: 0.65rem 1rem; cursor: pointer; }
+    .github-panel-title { font-family: var(--font-mono); font-size: 0.65rem;
+      letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+    .github-status { font-family: var(--font-mono); font-size: 0.65rem; color: var(--muted); }
+    .github-status.connected { color: var(--green); }
+    .github-body { display: none; padding: 1rem; border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 0.75rem; }
+    .github-body.open { display: flex; }
+    .github-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .github-actions { display: flex; gap: 0.5rem; }
+    .btn-github { flex: 1; background: var(--accent); border: none; border-radius: var(--radius);
+      color: var(--bg); font-family: var(--font-mono); font-weight: 700; font-size: 0.7rem;
+      letter-spacing: 0.1em; text-transform: uppercase; padding: 0.55rem 0.75rem;
+      cursor: pointer; transition: opacity 0.15s; }
+    .btn-github:hover { opacity: 0.85; }
+    .btn-github.secondary { background: transparent; color: var(--muted);
+      border: 1px solid var(--border); }
+    .btn-github.secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .github-note { font-family: var(--font-mono); font-size: 0.62rem; color: var(--muted);
+      letter-spacing: 0.04em; line-height: 1.6; }
+    .github-note a { color: var(--accent); }
+
+    /* ── Log section ── */
+    .log-section { width: 100%; max-width: 760px; margin-top: 1.5rem; }
+    .log-header { display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
+    .log-title { font-family: var(--font-mono); font-size: 0.7rem;
+      letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); }
+    .log-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+    .btn-sm { background: transparent; border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--cream-dim); font-family: var(--font-mono); font-size: 0.62rem;
+      letter-spacing: 0.08em; text-transform: uppercase; padding: 0.35rem 0.65rem;
+      cursor: pointer; transition: border-color 0.15s, color 0.15s; white-space: nowrap; }
+    .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-sm.danger:hover { border-color: #c0392b; color: #c0392b; }
+    .btn-sm.active { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Table ── */
+    .log-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+    table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 0.72rem; }
+    thead { background: var(--thead-bg); }
+    th { padding: 0.6rem 0.75rem; text-align: left; color: var(--accent); font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
+      border-bottom: 1px solid var(--border); }
+    td { padding: 0.55rem 0.75rem; color: var(--cream); border-bottom: 1px solid var(--border);
+      white-space: nowrap; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: rgba(255,255,255,0.04); }
+    .td-num { text-align: right; }
+    .td-cpg { color: var(--accent); font-weight: 700; text-align: right; }
+    .td-del { text-align: center; }
+    .del-btn { background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: 0.9rem; padding: 0; transition: color 0.15s; }
+    .del-btn:hover { color: #c0392b; }
+
+    .log-empty { font-family: var(--font-mono); font-size: 0.75rem;
+      color: var(--muted); text-align: center; padding: 2rem;
+      border: 1px solid var(--border); border-radius: var(--radius); }
+
+    .sync-indicator { font-family: var(--font-mono); font-size: 0.62rem; color: var(--muted);
+      letter-spacing: 0.06em; }
+    .sync-indicator.syncing { color: var(--accent); }
+    .sync-indicator.error   { color: #e05050; }
+    .sync-indicator.ok      { color: var(--green); }
+
+    /* ── Value badge ── */
+    .result-banner { position: relative; }
+    .value-badge { display: inline-flex; align-items: center; gap: 0.35rem;
+      margin-top: 0.65rem; padding: 0.3rem 0.75rem; border-radius: 99px;
+      font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      opacity: 0; transform: translateY(4px);
+      transition: opacity 0.25s, transform 0.25s, background 0.3s, color 0.3s; }
+    .value-badge.visible { opacity: 1; transform: translateY(0); }
+    .value-badge.tier-cheap     { background: rgba( 60,160, 80,0.18); color: #5ed97a; border: 1px solid rgba( 60,160, 80,0.35); }
+    .value-badge.tier-goto      { background: rgba( 80,160,220,0.15); color: #78c8f0; border: 1px solid rgba( 80,160,220,0.30); }
+    .value-badge.tier-splurge   { background: rgba(220,160, 40,0.15); color: var(--accent); border: 1px solid rgba(220,160,40,0.30); }
+    .value-badge.tier-expensive { background: rgba(220, 60, 60,0.15); color: #f07878; border: 1px solid rgba(220,60,60,0.30); }
+
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+    @media (max-width: 480px) {
+      .meta-row { grid-template-columns: 1fr; }
+      .form-body { padding: 1.25rem 1.25rem; }
+      .result-banner { padding: 1.5rem 1.25rem 1.25rem; }
+      .github-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Update banner -->
+  <div class="update-banner" id="updateBanner"></div>
+
+
+  <header class="header">
+    <p class="header-eyebrow">Bean Bench</p>
+    <h1>Coffee Cost Calculator</h1>
+  </header>
+
+  <div class="card">
+    <div class="result-banner">
+      <p class="result-label">Cost per gram</p>
+      <div class="result-value empty" id="resultValue">—</div>
+      <p class="result-unit">¢ / gram</p>
+      <div class="value-badge" id="valueBadge"></div>
+    </div>
+
+    <div class="form-body">
+      <div class="meta-row">
+        <div class="field">
+          <label for="beanName">Bean name</label>
+          <input type="text" id="beanName" placeholder="e.g. Ethiopia Yirg…" />
+        </div>
+        <div class="field">
+          <label for="vendorName">Vendor</label>
+          <input type="text" id="vendorName" placeholder="e.g. Blue Bottle" />
+        </div>
+      </div>
+
+      <div class="currency-row">
+        <div class="field" style="flex:0 0 auto; min-width:90px;">
+          <label for="currencySelect">Currency</label>
+          <select id="currencySelect">
+            <option value="$">USD ($)</option>
+            <option value="CA$">CAD ($)</option>
+            <option value="£">GBP (£)</option>
+            <option value="€">EUR (€)</option>
+            <option value="¥">JPY (¥)</option>
+            <option value="₩">KRW (₩)</option>
+            <option value="A$">AUD (A$)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="costInput">Package price</label>
+          <input type="number" id="costInput" min="0" step="0.01" placeholder="e.g. 18.50" />
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="weightInput">Package weight</label>
+          <input type="number" id="weightInput" min="0" step="any" placeholder="e.g. 250" />
+        </div>
+        <div class="unit-toggle">
+          <label>Unit</label>
+          <div class="unit-switch" id="unitSwitch">
+            <div class="unit-switch-pill" id="unitPill"></div>
+            <div class="unit-switch-opt active" data-unit="g">g</div>
+            <div class="unit-switch-opt" data-unit="kg">kg</div>
+            <div class="unit-switch-opt" data-unit="oz">oz</div>
+            <div class="unit-switch-opt" data-unit="lb">lb</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="save-btn" id="saveBtn" disabled>+ Save Entry to Log</button>
+    </div>
+
+    <div class="divider"></div>
+    <p class="conversion-note" id="conversionNote"></p>
+  </div>
+
+  <!-- GitHub Gist Sync Panel -->
+  <div class="github-panel" id="githubPanel">
+    <div class="github-panel-header" id="githubToggle">
+      <span class="github-panel-title">☁ GitHub Gist Sync</span>
+      <span class="github-status" id="githubStatus">Not configured</span>
+    </div>
+    <div class="github-body" id="githubBody">
+      <p class="github-note">
+        Store your price log in a private GitHub Gist — accessible from any device.
+        Create a token at <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a>
+        with <strong>gist</strong> scope. Your token is saved only in this browser.
+      </p>
+      <div class="github-row">
+        <div class="field">
+          <label>GitHub Token</label>
+          <input type="password" id="ghToken" placeholder="ghp_…" />
+        </div>
+        <div class="field">
+          <label>Gist ID (leave blank to create)</label>
+          <input type="text" id="ghGistId" placeholder="auto-created on first push" />
+        </div>
+      </div>
+      <div class="github-actions">
+        <button class="btn-github" id="ghSaveConfig">Save Config</button>
+        <button class="btn-github secondary" id="ghPull">↓ Pull from Gist</button>
+        <button class="btn-github secondary" id="ghPush">↑ Push to Gist</button>
+      </div>
+      <p class="github-note" id="ghFeedback"></p>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <section class="log-section">
+    <div class="log-header">
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <span class="log-title" id="logTitle">Price Log</span>
+        <span class="sync-indicator" id="syncIndicator"></span>
+      </div>
+      <div class="log-actions">
+        <button class="btn-sm" id="sortBtn">Sort: Date</button>
+        <button class="btn-sm" id="recalcBtn">↺ Recalc</button>
+        <button class="btn-sm" id="exportBtn">↓ .xlsx</button>
+        <button class="btn-sm danger" id="clearBtn">Clear</button>
+      </div>
+    </div>
+    <div id="logContainer"></div>
+  </section>
+
+  <!-- Theme slider footer -->
+  <div class="theme-footer">
+    <div class="theme-footer-row">
+      <span class="theme-footer-label">Theme</span>
+      <input type="range" class="theme-slider" id="themeSlider" min="0" max="3" step="1" value="0" />
+      <span class="theme-name-display" id="themeNameDisplay">S. America</span>
+    </div>
+    <div class="theme-pips">
+      <span class="theme-pip active" data-idx="0">🌿 S. America</span>
+      <span class="theme-pip" data-idx="1">🌍 Africa</span>
+      <span class="theme-pip" data-idx="2">🌋 C. America</span>
+      <span class="theme-pip" data-idx="3">🏯 SE Asia</span>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+  // ═══════════════════════════════════════════════
+  //  THEME SYSTEM
+  // ═══════════════════════════════════════════════
+  const FONT_URLS = {
+    '':               'https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600&family=Fira+Code:wght@400;600&family=Playfair+Display:wght@700&display=swap',
+    'africa':         'https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;700&family=Ubuntu+Mono:wght@400;700&family=Philosopher:wght@400;700&display=swap',
+    'central-america':'https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;700&family=Space+Mono:wght@400;700&family=Josefin+Sans:wght@400;700&display=swap',
+    'sea':            'https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;700&family=JetBrains+Mono:wght@400;700&family=Cinzel:wght@400;700&display=swap',
+  };
+
+  const THEME_KEYS  = ['', 'africa', 'central-america', 'sea'];
+  const THEME_NAMES = {
+    '': 'S. America', 'africa': 'Africa',
+    'central-america': 'C. America', 'sea': 'SE Asia'
+  };
+  const THEME_LONG = {
+    '': 'South America', 'africa': 'Africa',
+    'central-america': 'Central America', 'sea': 'Southeast Asia'
+  };
+
+  let currentTheme = localStorage.getItem('bb_theme') || '';
+
+  const themeSlider      = document.getElementById('themeSlider');
+  const themeNameDisplay = document.getElementById('themeNameDisplay');
+
+  function updateSliderTrack(val) {
+    const pct = (val / 3) * 100;
+    themeSlider.style.background =
+      `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, var(--border) ${pct}%)`;
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    document.getElementById('themeFonts').href = FONT_URLS[theme] || FONT_URLS[''];
+    localStorage.setItem('bb_theme', theme);
+    currentTheme = theme;
+    // Sync slider
+    const idx = THEME_KEYS.indexOf(theme);
+    if (idx >= 0) {
+      themeSlider.value = idx;
+      updateSliderTrack(idx);
+    }
+    // Sync name display
+    themeNameDisplay.textContent = THEME_NAMES[theme] || '';
+    // Sync pips
+    document.querySelectorAll('.theme-pip').forEach(p => {
+      p.classList.toggle('active', parseInt(p.dataset.idx) === (idx >= 0 ? idx : 0));
+    });
+  }
+
+  themeSlider.addEventListener('input', () => {
+    const idx = parseInt(themeSlider.value);
+    updateSliderTrack(idx);
+    applyTheme(THEME_KEYS[idx]);
+  });
+
+  document.querySelectorAll('.theme-pip').forEach(pip => {
+    pip.addEventListener('click', () => applyTheme(THEME_KEYS[parseInt(pip.dataset.idx)]));
+  });
+
+  applyTheme(currentTheme);
+
+  // ═══════════════════════════════════════════════
+  //  AUTO-UPDATE CHECK (GitHub releases)
+  // ═══════════════════════════════════════════════
+  const APP_VERSION   = '1.3.0';
+  const RELEASE_REPO  = 'flushwerks/bean-bench'; // update to your actual repo
+
+  async function checkForUpdates() {
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${RELEASE_REPO}/releases/latest`,
+        { headers: { Accept: 'application/vnd.github+json' } }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const latest = (data.tag_name || '').replace(/^v/, '');
+      if (latest && latest !== APP_VERSION) {
+        const banner = document.getElementById('updateBanner');
+        banner.innerHTML =
+          `⬆ Update available: v${latest} &nbsp;·&nbsp;
+           <a href="${data.html_url}" target="_blank">View release</a>
+           &nbsp;·&nbsp; <a href="${data.assets?.[0]?.browser_download_url || data.html_url}" target="_blank">Download</a>`;
+        banner.classList.add('visible');
+      }
+    } catch(e) { /* silent — no repo yet is fine */ }
+  }
+
+  checkForUpdates();
+
+  // ═══════════════════════════════════════════════
+  //  CORE CALCULATOR
+  // ═══════════════════════════════════════════════
+  const TO_GRAMS  = { g: 1, kg: 1000, oz: 28.3495, lb: 453.592 };
+  const STORE_KEY = 'coffee_log_v1';
+
+  let selectedUnit = 'g';
+  let entries      = [];
+  let currentCPG   = null;
+  let sortMode     = 'date';
+
+  const costInput    = document.getElementById('costInput');
+  const weightInput  = document.getElementById('weightInput');
+  const beanName     = document.getElementById('beanName');
+  const vendorName   = document.getElementById('vendorName');
+  const resultValue  = document.getElementById('resultValue');
+  const convNote     = document.getElementById('conversionNote');
+  const currencySel  = document.getElementById('currencySelect');
+  const saveBtn      = document.getElementById('saveBtn');
+  const exportBtn    = document.getElementById('exportBtn');
+  const clearBtn     = document.getElementById('clearBtn');
+  const recalcBtn    = document.getElementById('recalcBtn');
+  const sortBtn      = document.getElementById('sortBtn');
+  const logContainer = document.getElementById('logContainer');
+  const logTitle     = document.getElementById('logTitle');
+  const toast        = document.getElementById('toast');
+  const syncIndicator= document.getElementById('syncIndicator');
+
+  const valueBadge   = document.getElementById('valueBadge');
+
+  // ── Value badge ──────────────────────────────────────────
+  // Thresholds based on percentiles of the user's own log (cpg values).
+  // ≤ p20 → cheap · ≤ p40 → daily go-to · ≤ p60 → a splurge · > p60 → too expensive
+  // Falls back to absolute anchors when log has < 4 entries.
+  const FALLBACK = { cheap: 50, daily: 70, splurge: 90 }; // ¢/g absolute anchors
+
+  function percentile(sorted, p) {
+    const idx = (p / 100) * (sorted.length - 1);
+    const lo  = Math.floor(idx), hi = Math.ceil(idx);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+  }
+
+  function updateBadge(cpg) {
+    if (cpg === null) {
+      valueBadge.className = 'value-badge';
+      valueBadge.textContent = '';
+      return;
+    }
+
+    const cpgValues = entries.map(e => e.cpg).filter(v => typeof v === 'number').sort((a,b) => a-b);
+
+    let p20, p40, p60;
+    if (cpgValues.length >= 4) {
+      p20 = percentile(cpgValues, 20);
+      p40 = percentile(cpgValues, 40);
+      p60 = percentile(cpgValues, 60);
+    } else {
+      // Not enough data — use absolute fallbacks and note it
+      p20 = FALLBACK.cheap; p40 = FALLBACK.daily; p60 = FALLBACK.splurge;
+    }
+
+    let cls, icon, label;
+    if (cpg <= p20)      { cls = 'cheap';     icon = '💚'; label = 'Cheap'; }
+    else if (cpg <= p40) { cls = 'daily';     icon = '☕'; label = 'Daily Go-To'; }
+    else if (cpg <= p60) { cls = 'splurge';   icon = '✨'; label = 'A Splurge'; }
+    else                 { cls = 'expensive'; icon = '🔴'; label = 'Too Expensive'; }
+
+    if (cpgValues.length < 4) cls += ' no-data';
+
+    valueBadge.className  = `value-badge ${cls} visible`;
+    valueBadge.textContent = `${icon} ${label}`;
+    valueBadge.title = cpgValues.length >= 4
+      ? `Based on your log · p20=${Math.round(p20)}¢ · p40=${Math.round(p40)}¢ · p60=${Math.round(p60)}¢`
+      : `Fewer than 4 log entries — using default thresholds (${FALLBACK.cheap} / ${FALLBACK.daily} / ${FALLBACK.splurge} ¢/g)`;
+  }
+    try { entries = JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); }
+    catch(e) { entries = []; }
+  }
+
+  function saveEntries() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(entries)); } catch(e) {}
+  }
+
+  const unitSwitch = document.getElementById('unitSwitch');
+  const unitPill   = document.getElementById('unitPill');
+
+  function positionPill(activeOpt) {
+    unitPill.style.left  = activeOpt.offsetLeft + 'px';
+    unitPill.style.width = activeOpt.offsetWidth + 'px';
+  }
+
+  function selectUnit(unit) {
+    const opts = unitSwitch.querySelectorAll('.unit-switch-opt');
+    let activeOpt;
+    opts.forEach(o => {
+      const isActive = o.dataset.unit === unit;
+      o.classList.toggle('active', isActive);
+      if (isActive) activeOpt = o;
+    });
+    if (activeOpt) positionPill(activeOpt);
+    selectedUnit = unit;
+    const ph = { g:'e.g. 250', kg:'e.g. 0.25', oz:'e.g. 8.8', lb:'e.g. 0.55' };
+    weightInput.placeholder = ph[unit];
+    calculate();
+  }
+
+  unitSwitch.addEventListener('click', e => {
+    const opt = e.target.closest('.unit-switch-opt');
+    if (opt) selectUnit(opt.dataset.unit);
+  });
+
+  // Init pill position after layout
+  requestAnimationFrame(() => selectUnit('g'));
+
+  [costInput, weightInput, currencySel, beanName, vendorName]
+    .forEach(el => el.addEventListener('input', calculate));
+
+  function calculate() {
+    const cost   = parseFloat(costInput.value);
+    const weight = parseFloat(weightInput.value);
+    const sym    = currencySel.value;
+    if (!isFinite(cost) || !isFinite(weight) || cost <= 0 || weight <= 0) {
+      resultValue.textContent = '—'; resultValue.classList.add('empty');
+      convNote.textContent = ''; currentCPG = null; updateSaveBtn();
+      updateBadge(null); return;
+    }
+    const grams = weight * TO_GRAMS[selectedUnit];
+    currentCPG  = (cost / grams) * 100;
+    resultValue.textContent = Math.round(currentCPG);
+    resultValue.classList.remove('empty');
+    convNote.textContent = selectedUnit !== 'g'
+      ? `${weight} ${selectedUnit} = ${grams.toFixed(1)} g  ·  ${sym}${cost.toFixed(2)} ÷ ${grams.toFixed(1)} g × 100`
+      : `${sym}${cost.toFixed(2)} ÷ ${grams.toFixed(0)} g × 100`;
+    updateSaveBtn();
+    updateBadge(Math.round(currentCPG));
+  }
+
+  function updateSaveBtn() { saveBtn.disabled = currentCPG === null; }
+
+  const valueBadge = document.getElementById('valueBadge');
+
+  function updateBadge(cpg) {
+    if (cpg === null) {
+      valueBadge.className = 'value-badge'; valueBadge.textContent = ''; return;
+    }
+
+    // Build sorted array of cpg values from log for live percentiles
+    const vals = entries.map(e => e.cpg).filter(v => v != null).sort((a,b) => a - b);
+
+    let p20, p30, p40, p50;
+    if (vals.length >= 3) {
+      const pct = (p) => {
+        const idx = (p / 100) * (vals.length - 1);
+        const lo = Math.floor(idx), hi = Math.ceil(idx);
+        return vals[lo] + (vals[hi] - vals[lo]) * (idx - lo);
+      };
+      p20 = pct(20); p30 = pct(30); p40 = pct(40); p50 = pct(50);
+    } else {
+      // Sensible absolute fallbacks (¢/gram) when log is sparse
+      p20 = 50; p30 = 70; p40 = 90; p50 = 110;
+    }
+
+    let tier, label, icon;
+    if      (cpg <= p20) { tier = 'cheap';     label = 'Cheap';        icon = '💚'; }
+    else if (cpg <= p40) { tier = 'goto';      label = 'Daily go-to';  icon = '☕'; }
+    else if (cpg <= p50) { tier = 'splurge';   label = 'A splurge';    icon = '✨'; }
+    else                 { tier = 'expensive'; label = 'Too expensive'; icon = '🔴'; }
+
+    valueBadge.className = `value-badge tier-${tier} visible`;
+    valueBadge.textContent = `${icon} ${label}`;
+  }
+
+  saveBtn.addEventListener('click', () => {
+    if (currentCPG === null) return;
+    const cost  = parseFloat(costInput.value);
+    const weight = parseFloat(weightInput.value);
+    const grams  = weight * TO_GRAMS[selectedUnit];
+    const sym    = currencySel.value;
+    entries.unshift({
+      id:      Date.now(),
+      date:    new Date().toISOString().slice(0,10),
+      beanName: beanName.value.trim() || '—',
+      vendor:   vendorName.value.trim() || '—',
+      price:    sym + cost.toFixed(2),
+      sym, weight, unit: selectedUnit,
+      weightG:  parseFloat(grams.toFixed(2)),
+      cpg:      Math.round(currentCPG),
+      cost340:  parseFloat(((currentCPG/100)*340).toFixed(2)),
+    });
+    saveEntries();
+    renderLog();
+    showToast('Entry saved ✓');
+    autoGistPush();
+  });
+
+  // ── Sort ──
+  const SORT_MODES  = ['date','vendor','cost340'];
+  const SORT_LABELS = { date:'Sort: Date', vendor:'Sort: Vendor', cost340:'Sort: 340g Cost' };
+  sortBtn.addEventListener('click', () => {
+    sortMode = SORT_MODES[(SORT_MODES.indexOf(sortMode)+1) % SORT_MODES.length];
+    sortBtn.textContent = SORT_LABELS[sortMode];
+    renderLog();
+  });
+
+  function renderLog() {
+    logTitle.textContent = `Price Log (${entries.length})`;
+    if (entries.length === 0) {
+      logContainer.innerHTML = '<p class="log-empty">No entries yet — calculate a price and hit Save.</p>';
+      exportBtn.disabled = clearBtn.disabled = true; return;
+    }
+    exportBtn.disabled = clearBtn.disabled = false;
+
+    const view = entries.map((e,i) => ({...e, _i:i}));
+    if (sortMode === 'vendor')  view.sort((a,b) => (a.vendor||'').localeCompare(b.vendor||''));
+    if (sortMode === 'cost340') view.sort((a,b) => (a.cost340??Infinity)-(b.cost340??Infinity));
+
+    const rows = view.map(e => `
+      <tr>
+        <td class="td-cpg">${(e.sym||'')+(e.cost340!=null?e.cost340.toFixed(2):'—')}</td>
+        <td>${e.date}</td>
+        <td>${e.beanName}</td>
+        <td>${e.vendor}</td>
+        <td class="td-cpg">${e.cpg}</td>
+        <td>${e.price}</td>
+        <td class="td-num">${e.weight} ${e.unit}</td>
+        <td class="td-num">${e.weightG.toLocaleString()}</td>
+        <td class="td-del"><button class="del-btn" data-i="${e._i}">✕</button></td>
+      </tr>`).join('');
+
+    logContainer.innerHTML = `
+      <div class="log-table-wrap"><table>
+        <thead><tr>
+          <th>340g Cost</th><th>Date</th><th>Bean Name</th><th>Vendor</th>
+          <th>¢/g</th><th>Price</th><th>Weight</th><th>Grams</th><th></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+
+    logContainer.querySelectorAll('.del-btn').forEach(btn =>
+      btn.addEventListener('click', () => {
+        entries.splice(parseInt(btn.dataset.i), 1);
+        saveEntries(); renderLog(); autoGistPush();
+      })
+    );
+  }
+
+  // ── Recalc ──
+  recalcBtn.addEventListener('click', () => {
+    let n = 0;
+    entries.forEach(e => {
+      if (!e.sym && e.price) e.sym = e.price.replace(/[\d.,\s]/g,'').trim() || '$';
+      if (e.cpg != null) {
+        const c = parseFloat(((e.cpg/100)*340).toFixed(2));
+        if (e.cost340 !== c) { e.cost340 = c; n++; }
+      }
+    });
+    saveEntries(); renderLog();
+    showToast(n > 0 ? `Recalculated ${n} entr${n===1?'y':'ies'} ✓` : 'All entries up to date ✓');
+  });
+
+  // ── Export XLSX ──
+  exportBtn.addEventListener('click', () => {
+    const wb   = XLSX.utils.book_new();
+    const data = [
+      ['COFFEE BEAN PRICE LOG — ' + (THEME_LONG[currentTheme] || 'Bean Bench')],
+      ['Cost per gram tracker — Bean Bench v'+APP_VERSION],
+      [],
+      ['340g Cost','Date','Bean Name','Vendor','¢/gram','Price','Weight','Unit','Grams']
+    ];
+    entries.forEach(e => {
+      const c = e.cost340!=null?(e.sym||'')+e.cost340.toFixed(2):'—';
+      data.push([c,e.date,e.beanName,e.vendor,e.cpg,e.price,e.weight,e.unit,e.weightG]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{wch:12},{wch:14},{wch:26},{wch:22},{wch:8},{wch:10},{wch:8},{wch:5},{wch:10}];
+    ws['!merges'] = [{s:{r:0,c:0},e:{r:0,c:8}},{s:{r:1,c:0},e:{r:1,c:8}}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Coffee Price Log');
+    XLSX.writeFile(wb, `coffee-price-log-${new Date().toISOString().slice(0,10)}.xlsx`);
+    showToast('Spreadsheet downloaded ✓');
+  });
+
+  // ── Clear ──
+  clearBtn.addEventListener('click', () => {
+    if (!confirm('Clear all log entries? This cannot be undone.')) return;
+    entries = []; saveEntries(); renderLog();
+  });
+
+  // ═══════════════════════════════════════════════
+  //  GITHUB GIST SYNC
+  // ═══════════════════════════════════════════════
+  const GH_TOKEN_KEY = 'bb_gh_token';
+  const GH_GIST_KEY  = 'bb_gh_gist';
+  const GIST_FILENAME = 'bean-bench-log.json';
+
+  const ghToken  = document.getElementById('ghToken');
+  const ghGistId = document.getElementById('ghGistId');
+  const ghStatus = document.getElementById('githubStatus');
+  const ghFeedback = document.getElementById('ghFeedback');
+  const githubToggle = document.getElementById('githubToggle');
+  const githubBody   = document.getElementById('githubBody');
+
+  githubToggle.addEventListener('click', () =>
+    githubBody.classList.toggle('open')
+  );
+
+  function loadGhConfig() {
+    const tok  = localStorage.getItem(GH_TOKEN_KEY) || '';
+    const gist = localStorage.getItem(GH_GIST_KEY)  || '';
+    ghToken.value  = tok  ? '••••••••' : '';
+    ghGistId.value = gist;
+    updateGhStatus();
+  }
+
+  function updateGhStatus() {
+    const tok  = localStorage.getItem(GH_TOKEN_KEY);
+    const gist = localStorage.getItem(GH_GIST_KEY);
+    if (tok && gist) {
+      ghStatus.textContent = '● Connected'; ghStatus.className = 'github-status connected';
+    } else if (tok) {
+      ghStatus.textContent = '◌ Token set — no Gist yet'; ghStatus.className = 'github-status';
+    } else {
+      ghStatus.textContent = 'Not configured'; ghStatus.className = 'github-status';
+    }
+  }
+
+  document.getElementById('ghSaveConfig').addEventListener('click', () => {
+    const newTok  = ghToken.value.trim();
+    const newGist = ghGistId.value.trim();
+    if (newTok && !newTok.startsWith('•')) localStorage.setItem(GH_TOKEN_KEY, newTok);
+    if (newGist) localStorage.setItem(GH_GIST_KEY, newGist);
+    else localStorage.removeItem(GH_GIST_KEY);
+    updateGhStatus();
+    ghFeedback.textContent = 'Config saved.';
+    showToast('GitHub config saved ✓');
+  });
+
+  function setSyncState(state, msg) {
+    syncIndicator.textContent = msg || '';
+    syncIndicator.className   = 'sync-indicator ' + (state||'');
+  }
+
+  async function ghPush() {
+    const token = localStorage.getItem(GH_TOKEN_KEY);
+    if (!token) { ghFeedback.textContent = 'No token configured.'; return false; }
+    setSyncState('syncing', '↑ Pushing…');
+    const body   = JSON.stringify({ entries }, null, 2);
+    let gistId   = localStorage.getItem(GH_GIST_KEY);
+    try {
+      let res;
+      if (gistId) {
+        res = await fetch(`https://api.github.com/gists/${gistId}`, {
+          method: 'PATCH',
+          headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files: { [GIST_FILENAME]: { content: body } } })
+        });
+      } else {
+        res = await fetch('https://api.github.com/gists', {
+          method: 'POST',
+          headers: { Authorization: `token ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            description: 'Bean Bench — Coffee Price Log',
+            public: false,
+            files: { [GIST_FILENAME]: { content: body } }
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          gistId = data.id;
+          localStorage.setItem(GH_GIST_KEY, gistId);
+          ghGistId.value = gistId;
+          updateGhStatus();
+        }
+      }
+      if (res.ok) {
+        setSyncState('ok', '✓ Synced');
+        ghFeedback.textContent = `Pushed ${entries.length} entries to Gist ${gistId.slice(0,8)}…`;
+        return true;
+      } else {
+        const err = await res.json();
+        setSyncState('error', '✗ Error');
+        ghFeedback.textContent = `Push failed: ${err.message}`;
+        return false;
+      }
+    } catch(e) {
+      setSyncState('error', '✗ Network error');
+      ghFeedback.textContent = 'Network error: ' + e.message;
+      return false;
+    }
+  }
+
+  async function ghPull() {
+    const token  = localStorage.getItem(GH_TOKEN_KEY);
+    const gistId = localStorage.getItem(GH_GIST_KEY);
+    if (!token)  { ghFeedback.textContent = 'No token configured.'; return; }
+    if (!gistId) { ghFeedback.textContent = 'No Gist ID set. Push first to create one.'; return; }
+    setSyncState('syncing', '↓ Pulling…');
+    try {
+      const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+        headers: { Authorization: `token ${token}` }
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setSyncState('error', '✗ Error');
+        ghFeedback.textContent = `Pull failed: ${err.message}`; return;
+      }
+      const data    = await res.json();
+      const content = data.files?.[GIST_FILENAME]?.content;
+      if (!content) { ghFeedback.textContent = `File "${GIST_FILENAME}" not found in Gist.`; return; }
+      const parsed = JSON.parse(content);
+      entries = parsed.entries || parsed; // support both {entries:[]} and bare array
+      saveEntries();
+      renderLog();
+      setSyncState('ok', '✓ Pulled');
+      ghFeedback.textContent = `Loaded ${entries.length} entries from Gist.`;
+      showToast(`Pulled ${entries.length} entries ✓`);
+    } catch(e) {
+      setSyncState('error', '✗ Error');
+      ghFeedback.textContent = 'Error: ' + e.message;
+    }
+  }
+
+  function autoGistPush() {
+    if (localStorage.getItem(GH_TOKEN_KEY) && localStorage.getItem(GH_GIST_KEY)) ghPush();
+  }
+
+  document.getElementById('ghPush').addEventListener('click', async () => {
+    const ok = await ghPush();
+    if (ok) showToast('Pushed to Gist ✓');
+  });
+  document.getElementById('ghPull').addEventListener('click', ghPull);
+
+  // ── Toast ──
+  let toastTimer;
+  function showToast(msg) {
+    toast.textContent = msg; toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
+  }
+
+  // ── Init ──
+  loadEntries();
+  renderLog();
+  loadGhConfig();
+  </script>
+</body>
+</html>
